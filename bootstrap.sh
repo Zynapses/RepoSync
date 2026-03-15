@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 #
-# bootstrap.sh — One-step setup for github-sync on a new machine.
+# bootstrap.sh — Lightweight bootstrap for RepoSync on a machine
+# that already has git, gh, and jq installed.
 #
 # What it does:
 #   1. Checks prerequisites (git, gh, jq)
 #   2. Verifies GitHub CLI authentication
-#   3. Installs github-sync to ~/.local/bin
-#   4. Writes config from your git global identity
+#   3. Downloads & installs github-sync to ~/.local/bin
+#   4. Writes config from your git global identity (preserves existing)
 #   5. Installs a background service (launchd on macOS, systemd on Linux)
 #   6. Runs the first sync immediately
+#
+# Safe to re-run — preserves existing config and only restarts the
+# background service if the plist/unit actually changed.
 #
 # Usage:
 #   curl -sL https://raw.githubusercontent.com/Zynapses/RepoSync/main/bootstrap.sh | bash
@@ -17,11 +21,12 @@
 
 set -euo pipefail
 
-REPO_URL="https://github.com/Zynapses/RepoSync.git"
+RAW_BASE="https://raw.githubusercontent.com/Zynapses/RepoSync/main"
 INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/github-sync"
 DATA_DIR="$HOME/.local/share/github-sync"
 SYNC_INTERVAL=300  # 5 minutes
+PLIST_LABEL="com.github-sync.agent"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -36,7 +41,7 @@ fail()    { echo -e "${RED}✗${NC} $*"; exit 1; }
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
-echo "║        github-sync — One-Step Bootstrap         ║"
+echo "║        RepoSync — One-Step Bootstrap            ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 
@@ -82,33 +87,38 @@ else
     fail "Not authenticated. Run 'gh auth login' first, then re-run this script."
 fi
 
-# ─── 3. Get or clone the repo ────────────────────────────────────────────────
-echo ""
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-
-# Check if we're already inside the cloned repo
-if [[ -f "$SCRIPT_DIR/github-sync.sh" ]]; then
-    REPO_DIR="$SCRIPT_DIR"
-    success "Using local repo: $REPO_DIR"
-else
-    REPO_DIR="$(mktemp -d)"
-    info "Cloning github-sync..."
-    git clone --quiet "$REPO_URL" "$REPO_DIR"
-    success "Cloned to temporary directory"
-    CLEANUP_REPO=true
-fi
-
-# ─── 4. Install to ~/.local/bin ───────────────────────────────────────────────
+# ─── 3. Download & install github-sync ───────────────────────────────────────
 echo ""
 info "Installing github-sync..."
 mkdir -p "$INSTALL_DIR"
-cp "$REPO_DIR/github-sync.sh" "$INSTALL_DIR/github-sync"
-chmod +x "$INSTALL_DIR/github-sync"
-success "Installed to $INSTALL_DIR/github-sync"
 
-# Ensure ~/.local/bin is in PATH
+# Try local copy first (running from cloned repo), then download via curl.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" 2>/dev/null && pwd 2>/dev/null)" || SCRIPT_DIR=""
+
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/github-sync.sh" ]]; then
+    cp "$SCRIPT_DIR/github-sync.sh" "$INSTALL_DIR/github-sync"
+    success "Installed from local repo: $SCRIPT_DIR"
+else
+    info "Downloading github-sync.sh from $RAW_BASE ..."
+    if curl -fsSL "$RAW_BASE/github-sync.sh" -o "$INSTALL_DIR/github-sync"; then
+        success "Downloaded github-sync.sh"
+    else
+        fail "Failed to download github-sync.sh from $RAW_BASE/github-sync.sh"
+    fi
+fi
+
+chmod +x "$INSTALL_DIR/github-sync"
+
+# Verify the file is non-empty
+if [[ ! -s "$INSTALL_DIR/github-sync" ]]; then
+    fail "github-sync script is empty after install — download may have failed"
+fi
+
+success "Installed to $INSTALL_DIR/github-sync ($(wc -c < "$INSTALL_DIR/github-sync" | tr -d ' ') bytes)"
+
+# Ensure ~/.local/bin is in PATH (idempotent)
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
-    warn "$INSTALL_DIR is not in your PATH."
+    export PATH="$INSTALL_DIR:$PATH"
 
     SHELL_RC=""
     if [[ -f "$HOME/.zshrc" ]]; then
@@ -118,17 +128,19 @@ if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
     fi
 
     if [[ -n "$SHELL_RC" ]]; then
-        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_RC"
-        export PATH="$INSTALL_DIR:$PATH"
-        success "Added $INSTALL_DIR to PATH in $SHELL_RC"
+        if ! grep -qF "$INSTALL_DIR" "$SHELL_RC" 2>/dev/null; then
+            echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_RC"
+            success "Added $INSTALL_DIR to PATH in $SHELL_RC"
+        else
+            success "$INSTALL_DIR already in $SHELL_RC"
+        fi
     else
         warn "Add this to your shell profile: export PATH=\"$INSTALL_DIR:\$PATH\""
     fi
 fi
 
-# ─── 5. Write config ─────────────────────────────────────────────────────────
+# ─── 4. Write config ─────────────────────────────────────────────────────────
 echo ""
-info "Writing config..."
 mkdir -p "$CONFIG_DIR" "$DATA_DIR"
 
 GIT_NAME="$(git config --global user.name 2>/dev/null || echo "")"
@@ -141,7 +153,11 @@ if [[ -z "$GIT_NAME" || -z "$GIT_EMAIL" ]]; then
 Then re-run this script."
 fi
 
-cat > "$CONFIG_DIR/config" <<EOF
+# Preserve existing config — only write if missing
+if [[ -f "$CONFIG_DIR/config" ]]; then
+    success "Config already exists: $CONFIG_DIR/config (preserved)"
+else
+    cat > "$CONFIG_DIR/config" <<EOF
 # github-sync configuration
 # Generated by: bootstrap.sh
 # Date: $(date '+%Y-%m-%d %H:%M:%S')
@@ -154,28 +170,28 @@ GITHUB_SYNC_PROTOCOL="https"
 GITHUB_SYNC_FORKS="false"
 GITHUB_SYNC_ARCHIVED="false"
 EOF
+    success "Config written: $CONFIG_DIR/config"
+fi
 
-success "Config: $CONFIG_DIR/config"
 success "Identity: $GIT_NAME <$GIT_EMAIL>"
 
-# ─── 6. Install background service ───────────────────────────────────────────
+# ─── 5. Install background service ───────────────────────────────────────────
 echo ""
 info "Installing background service (every ${SYNC_INTERVAL}s)..."
 
 if [[ "$(uname)" == "Darwin" ]]; then
     # macOS — launchd
     PLIST_DIR="$HOME/Library/LaunchAgents"
-    PLIST_FILE="$PLIST_DIR/com.github-sync.agent.plist"
+    PLIST_FILE="$PLIST_DIR/${PLIST_LABEL}.plist"
     mkdir -p "$PLIST_DIR"
 
-    cat > "$PLIST_FILE" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
+    PLIST_CONTENT="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\"
+  \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
 <dict>
     <key>Label</key>
-    <string>com.github-sync.agent</string>
+    <string>${PLIST_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
         <string>${INSTALL_DIR}/github-sync</string>
@@ -194,12 +210,26 @@ if [[ "$(uname)" == "Darwin" ]]; then
         <string>${INSTALL_DIR}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
 </dict>
-</plist>
-PLIST
+</plist>"
 
-    launchctl unload "$PLIST_FILE" 2>/dev/null || true
-    launchctl load "$PLIST_FILE"
-    success "launchd agent installed: syncing every ${SYNC_INTERVAL}s, starts at login"
+    # Only reload if plist content changed or agent isn't loaded
+    NEEDS_RELOAD=false
+    if [[ ! -f "$PLIST_FILE" ]]; then
+        NEEDS_RELOAD=true
+    elif ! diff -q <(echo "$PLIST_CONTENT") "$PLIST_FILE" &>/dev/null; then
+        NEEDS_RELOAD=true
+    elif ! launchctl list 2>/dev/null | grep -q "$PLIST_LABEL"; then
+        NEEDS_RELOAD=true
+    fi
+
+    if [[ "$NEEDS_RELOAD" == "true" ]]; then
+        echo "$PLIST_CONTENT" > "$PLIST_FILE"
+        launchctl unload "$PLIST_FILE" 2>/dev/null || true
+        launchctl load "$PLIST_FILE"
+        success "launchd agent installed: syncing every ${SYNC_INTERVAL}s, starts at login"
+    else
+        success "launchd agent already running — no changes needed"
+    fi
 
 elif [[ "$(uname)" == "Linux" ]]; then
     # Linux — systemd
@@ -241,16 +271,11 @@ else
     warn "Unknown OS — skipping background service. Use: github-sync --loop $SYNC_INTERVAL"
 fi
 
-# ─── 7. Run first sync ───────────────────────────────────────────────────────
+# ─── 6. Run first sync ───────────────────────────────────────────────────────
 echo ""
 info "Running first sync..."
 echo ""
 "$INSTALL_DIR/github-sync"
-
-# ─── Cleanup ──────────────────────────────────────────────────────────────────
-if [[ "${CLEANUP_REPO:-false}" == "true" ]]; then
-    rm -rf "$REPO_DIR"
-fi
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
