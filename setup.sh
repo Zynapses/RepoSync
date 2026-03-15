@@ -12,7 +12,11 @@
 #   7. Run the first sync
 #
 # Usage (on a brand new machine):
-#   /bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/setup.sh)"
+#   GITHUB_TOKEN=ghp_xxxx /bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/setup.sh)"
+#
+# The GITHUB_TOKEN is a Personal Access Token from:
+#   https://github.com/settings/tokens
+# Create one with 'repo' scope — reuse it on every machine.
 
 set -euo pipefail
 
@@ -142,16 +146,26 @@ header "Step 4/7: GitHub authentication"
 if gh auth status &>/dev/null; then
     logged_in_as="$(gh api user --jq '.login' 2>/dev/null || echo "unknown")"
     success "Already authenticated as: $logged_in_as"
+elif [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    info "Authenticating with provided GITHUB_TOKEN..."
+    echo "$GITHUB_TOKEN" | gh auth login --with-token
+    if gh auth status &>/dev/null; then
+        logged_in_as="$(gh api user --jq '.login' 2>/dev/null || echo "unknown")"
+        success "Authenticated as: $logged_in_as"
+    else
+        fail "Token authentication failed. Check your GITHUB_TOKEN and re-run."
+    fi
 else
-    info "You need to authenticate with GitHub."
-    info "A browser window will open — log in and authorize the CLI."
+    # No token provided — try interactive browser login
+    info "No GITHUB_TOKEN provided. Opening browser for login..."
+    info "(Tip: Set GITHUB_TOKEN=ghp_xxx to skip this step next time)"
     echo ""
     gh auth login --web --git-protocol https
     if gh auth status &>/dev/null; then
         logged_in_as="$(gh api user --jq '.login' 2>/dev/null || echo "unknown")"
         success "Authenticated as: $logged_in_as"
     else
-        fail "Authentication failed. Please run 'gh auth login' manually and re-run this script."
+        fail "Authentication failed. Get a token at https://github.com/settings/tokens and re-run with:\n  GITHUB_TOKEN=ghp_xxx ./setup.sh"
     fi
 fi
 

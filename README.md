@@ -4,26 +4,28 @@ Keep all your GitHub repos in sync across multiple computers. Automatically clon
 
 ## Quick Start (One Command)
 
-On any new machine — even one with nothing installed yet:
+### Step 1: Create a GitHub token (once, from any computer)
+
+Go to **https://github.com/settings/tokens** → **Generate new token (classic)** → check **`repo`** scope → copy the token.
+
+Save this token somewhere safe — you'll reuse it on every machine.
+
+### Step 2: Run this on each new computer
 
 ```bash
-/bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/setup.sh)"
+GITHUB_TOKEN=ghp_your_token_here /bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/setup.sh)"
 ```
 
-This single command handles **everything**:
+That's it. One command. It handles **everything**:
 1. Installs Homebrew (macOS) or configures apt/dnf (Linux)
 2. Installs `git`, `gh`, and `jq` if missing
 3. Sets up git identity if not configured
-4. Authenticates with GitHub (opens browser)
+4. Authenticates with GitHub using your token (no browser needed)
 5. Installs `github-sync` to `~/.local/bin`
 6. Writes config, sets up background sync (every 5 min)
-7. Runs the first full sync
+7. Clones all your repos and runs the first sync
 
-If you already have `git`, `gh`, and `jq` and just want the sync tool:
-
-```bash
-curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/bootstrap.sh | bash
-```
+If you omit `GITHUB_TOKEN`, it will fall back to opening a browser for login.
 
 ## How It Works
 
