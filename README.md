@@ -2,17 +2,23 @@
 
 Keep all your GitHub repos in sync across multiple computers. Automatically clones new repos, pulls updates, pushes local commits, and ensures consistent git configuration.
 
-## Quick Start
+## Quick Start (One Step)
 
 ```bash
-# On each computer:
+# On any new computer — installs, configures, starts background sync:
+curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/bootstrap.sh | bash
+```
+
+Or if you prefer to inspect before running:
+
+```bash
 git clone https://github.com/Zynapses/github-sync.git
 cd github-sync
-./install.sh
-github-sync --setup
-github-sync --dry-run   # preview
-github-sync             # run for real
+./bootstrap.sh
 ```
+
+The bootstrap script handles everything: installs the tool, writes config from your
+git identity, sets up a background service (every 5 min), and runs the first sync.
 
 ## How It Works
 
