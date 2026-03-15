@@ -1,6 +1,8 @@
-# github-sync
+# RepoSync
 
 Keep all your GitHub repos in sync across multiple computers automatically. One command sets up everything — clones new repos, pulls updates, pushes local commits, and runs in the background.
+
+> Formerly `github-sync`. Now maintained as a standalone project.
 
 ---
 
@@ -24,7 +26,7 @@ The setup script installs these automatically, but if you want to do it yourself
 Open a terminal on any machine and run:
 
 ```bash
-/bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/setup.sh)"
+/bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/RepoSync/main/setup.sh)"
 ```
 
 ### What that command does

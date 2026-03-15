@@ -11,13 +11,13 @@
 #   6. Runs the first sync immediately
 #
 # Usage:
-#   curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/bootstrap.sh | bash
+#   curl -sL https://raw.githubusercontent.com/Zynapses/RepoSync/main/bootstrap.sh | bash
 #   # — or —
-#   git clone https://github.com/Zynapses/github-sync.git && cd github-sync && ./bootstrap.sh
+#   git clone https://github.com/Zynapses/RepoSync.git && cd RepoSync && ./bootstrap.sh
 
 set -euo pipefail
 
-REPO_URL="https://github.com/Zynapses/github-sync.git"
+REPO_URL="https://github.com/Zynapses/RepoSync.git"
 INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/github-sync"
 DATA_DIR="$HOME/.local/share/github-sync"

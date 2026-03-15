@@ -12,7 +12,7 @@
 #   7. Run the first sync
 #
 # Usage (on a brand new machine):
-#   /bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/github-sync/main/setup.sh)"
+#   /bin/bash -c "$(curl -sL https://raw.githubusercontent.com/Zynapses/RepoSync/main/setup.sh)"
 #
 # Prerequisite: gh must be authenticated (Windsurf/Kiro handles this automatically).
 
@@ -22,7 +22,7 @@ set -euo pipefail
 GH_USER="Zynapses"
 DEFAULT_GIT_NAME="Zynapses"
 DEFAULT_GIT_EMAIL="bob.long@zynapses.ai"
-REPO_URL="https://github.com/${GH_USER}/github-sync.git"
+REPO_URL="https://github.com/${GH_USER}/RepoSync.git"
 INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/github-sync"
 DATA_DIR="$HOME/.local/share/github-sync"
