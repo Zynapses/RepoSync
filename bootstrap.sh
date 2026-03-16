@@ -21,7 +21,8 @@
 
 set -euo pipefail
 
-RAW_BASE="https://raw.githubusercontent.com/Zynapses/RepoSync/main"
+REPO_OWNER="Zynapses"
+RAW_BASE="https://raw.githubusercontent.com/${REPO_OWNER}/RepoSync/main"
 INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/github-sync"
 DATA_DIR="$HOME/.local/share/github-sync"
@@ -169,6 +170,7 @@ GITHUB_SYNC_GIT_EMAIL="$GIT_EMAIL"
 GITHUB_SYNC_PROTOCOL="https"
 GITHUB_SYNC_FORKS="false"
 GITHUB_SYNC_ARCHIVED="false"
+GITHUB_SYNC_OWNER="$REPO_OWNER"
 EOF
     success "Config written: $CONFIG_DIR/config"
 fi

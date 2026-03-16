@@ -29,6 +29,7 @@ CLONE_PROTOCOL="${GITHUB_SYNC_PROTOCOL:-https}"  # "https" or "ssh"
 LOG_FILE="${GITHUB_SYNC_LOG:-$HOME/.local/share/github-sync/sync.log}"
 INCLUDE_FORKS="${GITHUB_SYNC_FORKS:-false}"       # "true" to include forks
 INCLUDE_ARCHIVED="${GITHUB_SYNC_ARCHIVED:-false}"  # "true" to include archived repos
+REPO_OWNER="${GITHUB_SYNC_OWNER:-}"                 # GitHub user or org to list repos from
 # ──────────────────────────────────────────────────────────────────────────────
 
 DRY_RUN=false
@@ -454,7 +455,11 @@ fetch_repo_list() {
         flags+=(--no-archived)
     fi
 
-    gh repo list "${flags[@]}" --json name,sshUrl,url,defaultBranchRef,isFork,isArchived
+    if [[ -n "$REPO_OWNER" ]]; then
+        gh repo list "$REPO_OWNER" "${flags[@]}" --json name,sshUrl,url,defaultBranchRef,isFork,isArchived
+    else
+        gh repo list "${flags[@]}" --json name,sshUrl,url,defaultBranchRef,isFork,isArchived
+    fi
 }
 
 # ─── Get clone URL based on protocol preference ──────────────────────────────
